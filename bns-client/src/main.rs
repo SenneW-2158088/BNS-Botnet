@@ -50,9 +50,9 @@ pub async fn hello() -> Result<()> {
     println!("Sent to: {:?}", output.success);
     println!("Not sent to: {:?}", output.failed);
 
+    // TODO: We can filter for events published only by the C2C server
     let subscription = Filter::new();
 
-    // Subscribe
     let output = client.subscribe(subscription.clone(), None).await?;
     println!("Subscription ID: {}", output.val);
 
@@ -61,7 +61,8 @@ pub async fn hello() -> Result<()> {
         .await?;
 
     println!("Listening for all events");
-    // Use tokio::time to keep the stream alive
+
+    // Used to keep the stream alive
     let timeout = tokio::time::sleep(Duration::from_secs(60)); // Listen for 60 seconds
     tokio::pin!(timeout);
 
@@ -78,7 +79,7 @@ pub async fn hello() -> Result<()> {
     }
 
     // Disconnect gracefully
-    client.disconnect_relay(RELAY);
+    client.disconnect_relay(RELAY).await.unwrap();
 
     Ok(())
 }
