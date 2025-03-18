@@ -2,7 +2,7 @@ use std::{sync::mpsc::Receiver, time::Duration};
 
 use nostr_sdk::prelude::*;
 
-use crate::CNC_PRIVATE_KEY;
+use crate::{CNC_PRIVATE_KEY, CNC_PUB_KEY};
 
 pub struct SessionProps {
     pub name: String,
@@ -14,6 +14,8 @@ pub struct SessionProps {
 pub struct Session {
     keys: Keys,
     client: Client,
+    name: String,
+    display_name: String,
 }
 
 impl Session {
@@ -38,19 +40,23 @@ impl Session {
         let metadata = Metadata::new()
             .name(props.name.as_str())
             .display_name(props.display_name.as_str())
-            .about("")
-            .nip05("username@example.com");
+            .about("I'm enabled");
 
         client.set_metadata(&metadata).await?;
 
-        Ok(Self { keys, client })
+        Ok(Self {
+            keys,
+            client,
+            display_name: props.display_name,
+            name: props.name,
+        })
     }
 
     pub async fn subscribe(&self, pubkey: PublicKey) -> Result<ReceiverStream<Event>> {
         let subscription = Filter::new()
             .kind(Kind::EncryptedDirectMessage)
-            .author(pubkey);
-        // .since(Timestamp::now());
+            .author(pubkey)
+            .pubkey(self.keys.public_key());
 
         let output = self.client.subscribe(subscription.clone(), None).await?;
         println!("Subscription ID: {}", output.val);
@@ -68,7 +74,15 @@ impl Session {
     }
 
     pub async fn update_about(&self, about: &str) -> Result<()> {
-        let metadata = Metadata::new().about(about);
+        // let metadata = self
+        //     .client
+        //     .fetch_metadata(self.keys.public_key, Duration::from_secs(10))
+        //     .await
+        //     .unwrap();
+        let metadata = Metadata::new()
+            .name(self.name.as_str())
+            .display_name(self.display_name.as_str())
+            .about(about);
         self.client.set_metadata(&metadata).await?;
         Ok(())
     }
@@ -77,9 +91,16 @@ impl Session {
         let encrypted =
             nip04::encrypt(self.keys.secret_key(), &pubkey, content.as_bytes()).unwrap();
         let tag = Tag::public_key(pubkey);
-        let event = EventBuilder::new(Kind::EncryptedDirectMessage, encrypted.clone()).tag(tag);
+        let event = EventBuilder::new(Kind::EncryptedDirectMessage, encrypted).tag(tag);
 
-        println!("sending event: {:?}", encrypted);
+        // let decrypted = nip04::decrypt(
+        //     &SecretKey::parse(CNC_PRIVATE_KEY).unwrap(),
+        //     &self.keys.public_key(),
+        //     encrypted.clone(),
+        // );
+
+        // println!("sending event: {:?}", encrypted);
+        // println!("sending event: {:?}", decrypted);
         self.client.send_event_builder(event).await?;
         Ok(())
     }
@@ -95,19 +116,9 @@ impl Session {
     > {
         let stream = self.subscribe(pubkey).await?;
         let decrypted_stream = stream.map(move |event| {
-            println!("received event: {:?}", event.content);
-
-            let decrypted = nip04::decrypt_to_bytes(
-                &self.keys.secret_key(),
-                &event.pubkey,
-                event.content.clone(),
-            );
+            let decrypted = nip04::decrypt(&self.keys.secret_key(), &pubkey, event.content.clone());
             if let Ok(decrypted) = decrypted {
-                println!("DECRYPT OK");
-                String::from_utf8(decrypted).unwrap_or_else(|_| {
-                    println!("DECRYPT FAILED");
-                    event.content.clone()
-                })
+                decrypted
             } else {
                 if let Err(e) = decrypted {
                     println!("Error: {:?}", e);

