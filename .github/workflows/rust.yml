@@ -20,19 +20,12 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y just
-    - name: Cache
-      uses: actions/cache@v3.4.3
-      with:
-        # A list of files, directories, and wildcard patterns to cache and restore
-        path: ./target
-        # An explicit key for restoring and saving the cache
-        key: just-6e177edb29704ca9cf16dae4de349bb0b4bf0638c9fe209e888051d53789ab21-33456bb0305ffc0a8d2c332687b4282976341fc0
-    - name: Build
-      run: just linux-x86
+    #   run: just linux-x86
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v2
       with:
-        files: ./payload/client-x86_64-unknown-linux-gnu
+        tag_name: ${{ github.ref_name }}
+        files: ./README.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
