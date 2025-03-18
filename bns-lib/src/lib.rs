@@ -1,4 +1,5 @@
-pub mod commands;
+pub mod bot;
+pub mod command;
 pub mod session;
 
 pub const CNC_PUB_KEY: &str = "npub1sauayadvjyzlf5z3g5hdtwwv9kyzsx0gcegxtvkwqqxg64u79n9svhjwwl";

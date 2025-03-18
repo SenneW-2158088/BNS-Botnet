@@ -16,10 +16,11 @@ pub struct Session {
     client: Client,
     name: String,
     display_name: String,
+    relays: Vec<String>,
 }
 
 impl Session {
-    pub async fn create(props: SessionProps) -> Result<Self> {
+    pub fn create(props: SessionProps) -> Self {
         let keys: Keys = match props.private_key {
             Some(key) => Keys::parse(key.as_str()).unwrap(),
             None => Keys::generate(),
@@ -31,25 +32,23 @@ impl Session {
 
         let client = Client::builder().signer(keys.clone()).opts(opts).build();
 
-        for relay in props.relays {
-            client.add_relay(relay.as_str()).await?;
-            client.connect_relay(relay.as_str()).await?;
-            println!("Connected to relay: {}", relay);
-        }
-
-        let metadata = Metadata::new()
-            .name(props.name.as_str())
-            .display_name(props.display_name.as_str())
-            .about("I'm enabled");
-
-        client.set_metadata(&metadata).await?;
-
-        Ok(Self {
+        Self {
             keys,
             client,
             display_name: props.display_name,
             name: props.name,
-        })
+            relays: props.relays,
+        }
+    }
+
+    pub async fn init(&self) -> Result<()> {
+        for relay in &self.relays {
+            self.client.add_relay(relay.as_str()).await?;
+            self.client.connect_relay(relay.as_str()).await?;
+            println!("Connected to relay: {}", relay);
+        }
+
+        Ok(())
     }
 
     pub async fn subscribe(&self, pubkey: PublicKey) -> Result<ReceiverStream<Event>> {
@@ -73,17 +72,14 @@ impl Session {
         Ok(stream)
     }
 
-    pub async fn update_about(&self, about: &str) -> Result<()> {
-        // let metadata = self
-        //     .client
-        //     .fetch_metadata(self.keys.public_key, Duration::from_secs(10))
-        //     .await
-        //     .unwrap();
+    pub async fn update_metadata(&self, about: &str) -> Result<()> {
         let metadata = Metadata::new()
             .name(self.name.as_str())
             .display_name(self.display_name.as_str())
             .about(about);
+
         self.client.set_metadata(&metadata).await?;
+
         Ok(())
     }
 
