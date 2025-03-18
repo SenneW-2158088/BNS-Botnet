@@ -1,6 +1,8 @@
-use std::time::Duration;
+use std::{sync::mpsc::Receiver, time::Duration};
 
 use nostr_sdk::prelude::*;
+
+use crate::CNC_PRIVATE_KEY;
 
 pub struct SessionProps {
     pub name: String,
@@ -20,6 +22,8 @@ impl Session {
             Some(key) => Keys::parse(key.as_str()).unwrap(),
             None => Keys::generate(),
         };
+        println!("PRIVATE KEY:{:?}", keys.secret_key().to_bech32());
+        println!("PUBLIC KEY: {:?}", keys.public_key().to_bech32());
         let connection: Connection = Connection::new();
         let opts = Options::new().connection(connection);
 
@@ -43,7 +47,9 @@ impl Session {
     }
 
     pub async fn subscribe(&self, pubkey: PublicKey) -> Result<ReceiverStream<Event>> {
-        let subscription = Filter::new().author(pubkey);
+        let subscription = Filter::new()
+            .kind(Kind::EncryptedDirectMessage)
+            .author(pubkey);
         // .since(Timestamp::now());
 
         let output = self.client.subscribe(subscription.clone(), None).await?;
@@ -51,7 +57,12 @@ impl Session {
 
         let stream = self
             .client
-            .stream_events(subscription, Duration::MAX)
+            .pool()
+            .stream_events(
+                subscription,
+                Duration::MAX,
+                ReqExitPolicy::WaitDurationAfterEOSE(Duration::MAX),
+            )
             .await?;
         Ok(stream)
     }
@@ -63,12 +74,47 @@ impl Session {
     }
 
     pub async fn send_msg(&self, content: &str, pubkey: PublicKey) -> Result<()> {
-        let nip = nip04::encrypt(self.keys.secret_key(), &pubkey, content.as_bytes()).unwrap();
+        let encrypted =
+            nip04::encrypt(self.keys.secret_key(), &pubkey, content.as_bytes()).unwrap();
         let tag = Tag::public_key(pubkey);
-        let event = EventBuilder::new(Kind::EncryptedDirectMessage, nip).tag(tag);
+        let event = EventBuilder::new(Kind::EncryptedDirectMessage, encrypted.clone()).tag(tag);
 
-        println!("sending event...");
+        println!("sending event: {:?}", encrypted);
         self.client.send_event_builder(event).await?;
         Ok(())
+    }
+
+    pub async fn receive_msgs(
+        &self,
+        pubkey: PublicKey,
+    ) -> Result<
+        nostr_sdk::async_utility::futures_util::stream::Map<
+            ReceiverStream<Event>,
+            impl FnMut(Event) -> String,
+        >,
+    > {
+        let stream = self.subscribe(pubkey).await?;
+        let decrypted_stream = stream.map(move |event| {
+            println!("received event: {:?}", event.content);
+
+            let decrypted = nip04::decrypt_to_bytes(
+                &self.keys.secret_key(),
+                &event.pubkey,
+                event.content.clone(),
+            );
+            if let Ok(decrypted) = decrypted {
+                println!("DECRYPT OK");
+                String::from_utf8(decrypted).unwrap_or_else(|_| {
+                    println!("DECRYPT FAILED");
+                    event.content.clone()
+                })
+            } else {
+                if let Err(e) = decrypted {
+                    println!("Error: {:?}", e);
+                }
+                event.content
+            }
+        });
+        Ok(decrypted_stream)
     }
 }
