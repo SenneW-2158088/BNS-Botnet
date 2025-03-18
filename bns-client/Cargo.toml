@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 nostr-sdk = { workspace = true }
 tokio = { workspace = true }
+bns-lib = { path = "../bns-lib" }

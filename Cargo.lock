@@ -196,6 +196,7 @@ version = "0.1.0"
 name = "bns-client"
 version = "0.1.0"
 dependencies = [
+ "bns-lib",
  "nostr-sdk",
  "tokio",
 ]
@@ -211,6 +212,9 @@ dependencies = [
 [[package]]
 name = "bns-lib"
 version = "0.1.0"
+dependencies = [
+ "nostr-sdk",
+]
 
 [[package]]
 name = "bumpalo"
