@@ -20,8 +20,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y just
-    - name: Build
-      run: just linux-x86
     - name: Cache
       uses: actions/cache@v3.4.3
       with:
@@ -29,6 +27,8 @@ jobs:
         path: ./target
         # An explicit key for restoring and saving the cache
         key: ${{ runner.os }}-just-${{ hashFiles('**/justfile') }}-${{ github.sha }}
+    - name: Build
+      run: just linux-x86
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v2
