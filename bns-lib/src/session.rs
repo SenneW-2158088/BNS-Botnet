@@ -12,7 +12,7 @@ pub struct SessionProps {
 }
 
 pub struct Session {
-    keys: Keys,
+    pub keys: Keys,
     client: Client,
     name: String,
     display_name: String,
