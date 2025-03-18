@@ -24,10 +24,8 @@ jobs:
       run: just linux-x86
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
         files: ./payload/client-x86_64-unknown-linux-gnu
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
