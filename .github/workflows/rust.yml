@@ -22,10 +22,18 @@ jobs:
         sudo apt-get install -y just
     - name: Build
       run: just linux-x86
+    - name: Cache
+      uses: actions/cache@v3.4.3
+      with:
+        # A list of files, directories, and wildcard patterns to cache and restore
+        path: ./target
+        # An explicit key for restoring and saving the cache
+        key: ${{ runner.os }}-just-${{ hashFiles('**/justfile') }}-${{ github.sha }}
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref }}
         files: ./payload/client-x86_64-unknown-linux-gnu
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
