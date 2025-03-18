@@ -20,6 +20,7 @@
             rust-analyzer
             clippy
             rustfmt
+            just
           ];
         };
       }

@@ -1,0 +1,7 @@
+struct Bot {
+
+}
+
+impl Bot {
+
+}

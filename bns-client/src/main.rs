@@ -43,6 +43,7 @@ pub async fn run() -> Result<()> {
 
 #[tokio::main]
 async fn main() {
+
     match run().await {
         Err(e) => {
             println!("Got an error {}", e.to_string())
