@@ -4,8 +4,8 @@ default:
 payload_dir := "./payload"
 build_dir := "./target"
 
-linux-x86 := "x86_64-unknown-linux-gnu"
-aarch64-darwin := "aarch64-apple-darwin"
+linux-x86 := "x86_64"
+aarch64-darwin := "aarch64"
 
 # Ensure the payloads directory exists
 _ensure-dir:

