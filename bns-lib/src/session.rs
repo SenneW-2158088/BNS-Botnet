@@ -51,20 +51,14 @@ impl Session {
         Ok(())
     }
 
-    pub async fn subscribe(&self, pubkey: PublicKey) -> Result<ReceiverStream<Event>> {
-        let subscription = Filter::new()
-            .kind(Kind::EncryptedDirectMessage)
-            .author(pubkey)
-            .pubkey(self.keys.public_key());
-
-        let output = self.client.subscribe(subscription.clone(), None).await?;
-        println!("Subscription ID: {}", output.val);
+    pub async fn subscribe(&self, filter: Filter) -> Result<ReceiverStream<Event>> {
+        let output = self.client.subscribe(filter.clone(), None).await?;
 
         let stream = self
             .client
             .pool()
             .stream_events(
-                subscription,
+                filter,
                 Duration::MAX,
                 ReqExitPolicy::WaitDurationAfterEOSE(Duration::MAX),
             )
@@ -83,17 +77,16 @@ impl Session {
         Ok(())
     }
 
+    pub async fn subscribe_notes(&self, pubkey: PublicKey) -> Result<ReceiverStream<Event>> {
+        let filter = Filter::new().kind(Kind::TextNote).author(pubkey);
+        return self.subscribe(filter).await;
+    }
+
     pub async fn send_msg(&self, content: &str, pubkey: PublicKey) -> Result<()> {
         let encrypted =
             nip04::encrypt(self.keys.secret_key(), &pubkey, content.as_bytes()).unwrap();
         let tag = Tag::public_key(pubkey);
         let event = EventBuilder::new(Kind::EncryptedDirectMessage, encrypted).tag(tag);
-
-        // let decrypted = nip04::decrypt(
-        //     &SecretKey::parse(CNC_PRIVATE_KEY).unwrap(),
-        //     &self.keys.public_key(),
-        //     encrypted.clone(),
-        // );
 
         // println!("sending event: {:?}", encrypted);
         // println!("sending event: {:?}", decrypted);
@@ -110,7 +103,12 @@ impl Session {
             impl FnMut(Event) -> String,
         >,
     > {
-        let stream = self.subscribe(pubkey).await?;
+        let filter = Filter::new()
+            .kind(Kind::EncryptedDirectMessage)
+            .author(pubkey)
+            .pubkey(self.keys.public_key());
+
+        let stream = self.subscribe(filter).await?;
         let decrypted_stream = stream.map(move |event| {
             let decrypted = nip04::decrypt(&self.keys.secret_key(), &pubkey, event.content.clone());
             if let Ok(decrypted) = decrypted {

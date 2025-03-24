@@ -383,6 +383,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "nostr-sdk",
+ "tokio",
  "uuid",
 ]
 
