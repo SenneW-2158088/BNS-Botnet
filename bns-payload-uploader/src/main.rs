@@ -51,6 +51,7 @@ async fn upload_payload(
         .json::<response::FilebinResponse>()
         .await
         .map_err(|_| ())?;
+
     Ok(response)
 }
 
@@ -62,9 +63,6 @@ async fn download_payload(client: &RClient, architecture: &str) -> Result<Bytes,
         return Err(());
     }
     let payload = response.bytes().await.map_err(|e| ())?;
-
-    let mut file = File::create(architecture).unwrap();
-    file.write(&payload).unwrap();
 
     Ok(payload)
 }
@@ -112,7 +110,7 @@ async fn run() -> Result<()> {
         }
     }
 
-    let serialized = serde_json::to_string(&filebin_urls);
+    let serialized = serde_json::to_string(&filebin_urls).unwrap();
     println!("[+] Created serialized table");
     println!("{:?}", serialized);
 
@@ -122,37 +120,23 @@ async fn run() -> Result<()> {
     let opts = Options::new().connection(connection);
     let client = Client::builder().signer(keys.clone()).opts(opts).build();
 
-    let server_config =
-        nip96::get_server_config(Url::parse(bns_lib::FILE_STORAGE_SERVER)?, None).await?;
-
     println!("[i] Connecting to nostr");
+    client
+        .add_relay(bns_lib::RELAY)
+        .await
+        .expect("failed to add relay");
 
-    // let props = bns_lib::session::SessionProps {
-    //     name: "payload-uploader".to_string(),
-    //     display_name: "payload-uploader".to_string(),
-    //     relays: Vec::from(bns_lib::RELAY).it
-    // }
-    // let session = bns_lib::session::Session::create(props);
+    client
+        .connect_relay(bns_lib::RELAY)
+        .await
+        .expect("failed to connect to relay");
 
-    // println!("[+] uploading data...");
+    println!("[+] uploading data...");
+    let builder = EventBuilder::text_note(serialized);
+    client.send_event_builder(builder).await.unwrap();
 
-    // let url = nip96::upload_data(
-    //     &client.signer().await?,
-    //     &server_config,
-    //     contents,
-    //     Some("text/plain"),
-    //     None,
-    // )
-    // .await?;
+    client.disconnect().await;
 
-    // println!("url: {}", url);
-
-    // TODO: upload this url as a note, such that clients can find it
-
-    // match client.upload_file(file_path, &contents) {
-    //     Ok(_) => println!("File uploaded successfully."),
-    //     Err(e) => eprintln!("Failed to upload file: {}", e),
-    // }
     Ok(())
 }
 

@@ -1,6 +1,6 @@
-use notify_rust::{Hint, Notification};
-
+#[cfg(target_os = "unix")]
 fn annoying_notification() {
+    use notify_rust::{Hint, Notification};
     let bible_verses = [
         "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope. - Jeremiah 29:11",
         "I can do all things through him who strengthens me. - Philippians 4:13",
@@ -31,6 +31,7 @@ fn annoying_notification() {
         .hint(Hint::Resident(true)) // this is not supported by all implementations
         .timeout(0) // this however is
         .urgency(notify_rust::Urgency::Critical)
+        .finalize()
         .show()
         .unwrap()
         .on_close(|| {
@@ -38,6 +39,21 @@ fn annoying_notification() {
         });
 }
 
+#[cfg(target_os = "macos")]
+fn open_browser(url: &str) {
+    use std::process::Command;
+    Command::new("open").arg(url).status();
+}
+
+#[cfg(target_os = "macos")]
+fn main() {
+    // annoying_notification();
+    open_browser(
+        "https://www.uhasselt.be/en/instituten-en/expertise-centre-for-digital-media/research/networked-and-secure-systems",
+    );
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
 fn main() {
     annoying_notification();
 }
