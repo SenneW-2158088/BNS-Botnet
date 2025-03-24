@@ -19,4 +19,3 @@ pub const RELAY: &str = "wss://relay.primal.net";
 // pub const FILE_STORAGE_SERVER: &str = "https://mockingyou.com/";
 
 pub const FILE_STORAGE_SERVER: &str = "https://files.sovbit.host";
-

