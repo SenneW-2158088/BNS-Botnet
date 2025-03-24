@@ -401,6 +401,7 @@ dependencies = [
  "bytes",
  "nostr-sdk",
  "reqwest",
+ "serde",
  "tokio",
 ]
 

