@@ -42,6 +42,7 @@ async fn run() -> Result<()> {
     let server_config = nip96::get_server_config(Url::parse(bns_lib::FILE_STORAGE_SERVER)?, None).await?;
 
     println!("[+] allowed mimetypes: {:?}", server_config.content_types);
+    println!("[+] server config: {:?}", server_config);
     
     println!("[+] uploading data...");
 

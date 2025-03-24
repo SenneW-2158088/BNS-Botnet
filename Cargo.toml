@@ -3,7 +3,7 @@ resolver = "2"
 members = [
   "bns-client",
   "bns-c2c",
-  "bns-lib", "bns-dropper", "bns-payload-uploader"
+  "bns-lib", "bns-dropper", "bns-payload-uploader", "bns-payload"
 ]
 
 [workspace.dependencies]
