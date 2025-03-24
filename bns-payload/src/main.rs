@@ -42,12 +42,11 @@ fn annoying_notification() {
 #[cfg(target_os = "macos")]
 fn open_browser(url: &str) {
     use std::process::Command;
-    Command::new("open").arg(url).status();
+    let _ = Command::new("open").arg(url).status();
 }
 
 #[cfg(target_os = "macos")]
 fn main() {
-    // annoying_notification();
     open_browser(
         "https://www.uhasselt.be/en/instituten-en/expertise-centre-for-digital-media/research/networked-and-secure-systems",
     );
