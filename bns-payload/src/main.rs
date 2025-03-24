@@ -1,4 +1,4 @@
-#[cfg(target_os = "unix")]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn annoying_notification() {
     use notify_rust::{Hint, Notification};
     let bible_verses = [
