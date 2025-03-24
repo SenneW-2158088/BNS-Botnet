@@ -10,6 +10,8 @@ pub enum Commands {
     PrivateKey(RequestPrivateKeyCommand),
     Help(HelpCommand),
     // TODO:
+    // SwitchRelay
+    // SwitchFileServer
     // Kill
     // HeartBeat : periodically send a health message to the CNC
     // SystemInformation

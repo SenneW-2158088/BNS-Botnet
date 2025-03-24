@@ -1,0 +1,9 @@
+[package]
+name = "bns-payload-uploader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nostr-sdk = { workspace = true }
+tokio = { workspace = true }
+bns-lib = { path = "../bns-lib" }

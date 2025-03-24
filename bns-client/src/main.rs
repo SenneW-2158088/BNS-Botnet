@@ -9,7 +9,7 @@ use bns_lib::{
 };
 use nostr_sdk::prelude::*;
 
-const RELAYS: [&str; 1] = ["wss://relay.primal.net"];
+const RELAYS: [&str; 1] = [bns_lib::RELAY];
 
 pub async fn run() -> Result<()> {
     let mut bot = Bot::create(Config {
