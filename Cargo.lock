@@ -402,6 +402,7 @@ dependencies = [
  "nostr-sdk",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
 ]
 
