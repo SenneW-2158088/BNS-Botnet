@@ -13,3 +13,4 @@ reqwest = { version = "0.12.14", features = [
     "rustls-tls",
 ], default-features = false }
 tempfile = "3"
+aes-gcm = "0.10.3"
