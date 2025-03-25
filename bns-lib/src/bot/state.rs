@@ -14,7 +14,7 @@ impl Default for State {
     fn default() -> Self {
         State {
             name: format!("bot-{}", Uuid::new_v4()),
-            enabled: true,
+            enabled: false,
             payload: None,
             child: None,
         }
@@ -25,11 +25,7 @@ impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r#"# Bot State Overview
------------------
-Name: {}
-Status: {}
------------------"#,
+            r#"Name: {} | Status: {}"#,
             self.name,
             if self.enabled {
                 "Enabled ✅"
