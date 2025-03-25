@@ -9,6 +9,7 @@ pub enum Commands {
     Enable(EnabledCommand),
     PrivateKey(RequestPrivateKeyCommand),
     Help(HelpCommand),
+    Sysinfo(),
     // TODO:
     // SwitchRelay
     // SwitchFileServer
@@ -54,6 +55,8 @@ use crate::{CNC_PUB_KEY, session::Session};
 pub trait Command {
     fn execute(&self, state: &mut State, session: &Session) -> impl Future<Output = Result<()>>;
 }
+
+pub struct SysInfoCommand {}
 
 pub struct HelloWorldCommand {}
 
