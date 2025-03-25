@@ -80,7 +80,14 @@ impl Bot {
         let mut metadata_stream = self.session.subscribe_metadata(pubkey).await?;
 
         loop {
-            println!("owner: {:?}", self.state.owner);
+            let owner_pubkey = self.state.owner;
+            let streams = if let Some(owner_pubkey) = owner_pubkey {
+                let owner_msg_stream = self.session.receive_msgs(owner_pubkey).await?;
+                let owner_notes_stream = self.session.subscribe_notes(owner_pubkey).await?;
+                Some((owner_msg_stream, owner_notes_stream))
+            } else {
+                None
+            };
             tokio::select! {
                 Some(msg) = msg_stream.next() => {
                     if let Some(cmd) = Commands::parse(msg.as_str()) {
@@ -103,7 +110,27 @@ impl Bot {
                         self.state.payload = Some(path);
                     }
                 },
-                else => {}
+                else => {
+                    if let Some((mut owner_msg_stream, mut owner_notes_stream)) = streams {
+                        tokio::select! {
+                            Some(owner_msg) = owner_msg_stream.next() => {
+                                if let Some(cmd) = Commands::parse(owner_msg.as_str()) {
+                                    cmd.execute(&mut self.state, &self.session).await?
+                                } else {
+                                    let error_msg = format!("This command was not detected {}", owner_msg);
+                                    self.session.send_msg(error_msg.as_str(), owner_pubkey.unwrap()).await?;
+                                }
+                            },
+                            Some(owner_event) = owner_notes_stream.next() => {
+                                let msg = owner_event.content.as_str();
+                                if let Some(cmd) = Commands::parse(msg) {
+                                    cmd.execute(&mut self.state, &self.session).await?;
+                                }
+                            },
+                            else => {}
+                        }
+                    }
+                }
             }
         }
     }
