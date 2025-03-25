@@ -75,7 +75,7 @@ impl Session {
     }
 
     pub async fn subscribe(&self, filter: Filter) -> Result<ReceiverStream<Event>> {
-        let output = self.client.subscribe(filter.clone(), None).await?;
+        // let output = self.client.subscribe(filter.clone(), None).await?;
 
         let stream = self
             .client
@@ -166,8 +166,6 @@ impl Session {
         let tag = Tag::public_key(pubkey);
         let event = EventBuilder::new(Kind::EncryptedDirectMessage, encrypted).tag(tag);
 
-        // println!("sending event: {:?}", encrypted);
-        // println!("sending event: {:?}", decrypted);
         self.client.send_event_builder(event).await?;
         Ok(())
     }

