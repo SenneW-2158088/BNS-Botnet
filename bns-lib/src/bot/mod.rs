@@ -80,6 +80,7 @@ impl Bot {
         let mut metadata_stream = self.session.subscribe_metadata(pubkey).await?;
 
         loop {
+            println!("owner: {:?}", self.state.owner);
             tokio::select! {
                 Some(msg) = msg_stream.next() => {
                     if let Some(cmd) = Commands::parse(msg.as_str()) {
@@ -96,8 +97,10 @@ impl Bot {
                     }
                 },
                 Some(metadata) = metadata_stream.next() => {
+                    println!("metadata: {:?}", metadata);
                     if let Some(path) = self.session.download_payload_from_metadata(metadata).await? {
-                       self.state.payload = Some(path);
+                        println!("Setting payload: {:?}", path);
+                        self.state.payload = Some(path);
                     }
                 },
                 else => {}

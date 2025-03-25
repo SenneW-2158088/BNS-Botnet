@@ -8,6 +8,7 @@ pub struct State {
     pub enabled: bool,
     pub payload: Option<TempPath>,
     pub child: Option<std::process::Child>,
+    pub owner: Option<nostr_sdk::PublicKey>,
 }
 
 impl Default for State {
@@ -17,6 +18,7 @@ impl Default for State {
             enabled: false,
             payload: None,
             child: None,
+            owner: None,
         }
     }
 }

@@ -39,7 +39,7 @@ async fn upload_payload(
     data: Bytes,
 ) -> Result<response::FilebinResponse, ()> {
     // let bin = generate_bin().await;
-    let bin = "im76vQIH";
+    let bin = "im76vQIa";
 
     let mut headers = HeaderMap::new();
     headers.insert("accept", HeaderValue::from_static("application/json"));

