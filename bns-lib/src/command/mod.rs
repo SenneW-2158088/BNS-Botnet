@@ -60,6 +60,19 @@ pub trait Command {
 
 pub struct SysInfoCommand {}
 
+fn format_size(size: u64) -> String {
+    const UNITS: [&str; 6] = ["B", "kB", "MB", "GB", "TB", "PB"];
+    let mut size = size as f64;
+    let mut unit = 0;
+
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+
+    format!("{:.2} {}", size, UNITS[unit])
+}
+
 impl Command for SysInfoCommand {
     async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
         use sysinfo::{Networks, System};
@@ -68,24 +81,32 @@ impl Command for SysInfoCommand {
 
         let mut content = String::new();
         content.push_str(&format!("=> system:\n"));
-        content.push_str(&format!("total memory: {} bytes\n", sys.total_memory()));
-        content.push_str(&format!("used memory : {} bytes\n", sys.used_memory()));
-        content.push_str(&format!("total swap  : {} bytes\n", sys.total_swap()));
-        content.push_str(&format!("used swap   : {} bytes\n", sys.used_swap()));
+        content.push_str(&format!(
+            "total memory: {}\n",
+            format_size(sys.total_memory())
+        ));
+        content.push_str(&format!(
+            "used memory : {}\n",
+            format_size(sys.used_memory())
+        ));
+        content.push_str(&format!(
+            "total swap  : {}\n",
+            format_size(sys.total_swap())
+        ));
+        content.push_str(&format!("used swap   : {}\n", format_size(sys.used_swap())));
 
-        content.push_str(&format!("System name:             {:?}\n", System::name()));
-        content.push_str(&format!(
-            "System kernel version:   {:?}\n",
-            System::kernel_version()
-        ));
-        content.push_str(&format!(
-            "System OS version:       {:?}\n",
-            System::os_version()
-        ));
-        content.push_str(&format!(
-            "System host name:        {:?}\n",
-            System::host_name()
-        ));
+        if let Some(name) = System::name() {
+            content.push_str(&format!("System name:             {}\n", name));
+        }
+        if let Some(kernel_version) = System::kernel_version() {
+            content.push_str(&format!("System kernel version:   {}\n", kernel_version));
+        }
+        if let Some(os_version) = System::os_version() {
+            content.push_str(&format!("System OS version:       {}\n", os_version));
+        }
+        if let Some(host_name) = System::host_name() {
+            content.push_str(&format!("System host name:        {}\n", host_name));
+        }
 
         content.push_str(&format!("NB CPUs: {}\n", sys.cpus().len()));
 
@@ -94,8 +115,8 @@ impl Command for SysInfoCommand {
         for (interface_name, data) in &networks {
             content.push_str(&format!(
                 "{interface_name}: {} B (down) / {} B (up)\n",
-                data.total_received(),
-                data.total_transmitted(),
+                format_size(data.total_received()),
+                format_size(data.total_transmitted()),
             ));
         }
 
