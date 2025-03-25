@@ -11,11 +11,11 @@ pub enum Commands {
     Help(HelpCommand),
     Sysinfo(SysInfoCommand),
     // TODO:
+    // SystemInformation
     // SwitchRelay
     // SwitchFileServer
     // Kill
     // HeartBeat : periodically send a health message to the CNC
-    // SystemInformation
 }
 
 pub type CommandResult = Result<String>;

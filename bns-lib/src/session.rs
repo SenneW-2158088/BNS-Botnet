@@ -5,9 +5,11 @@ use std::{
     time::Duration,
 };
 
-use nostr_sdk::prelude::*;
+use mac_address::get_mac_address;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
-use crate::{CNC_PRIVATE_KEY, CNC_PUB_KEY};
+use nostr_sdk::prelude::*;
 
 pub struct SessionProps {
     pub name: String,
@@ -28,8 +30,18 @@ impl Session {
     pub fn create(props: SessionProps) -> Self {
         let keys: Keys = match props.private_key {
             Some(key) => Keys::parse(key.as_str()).unwrap(),
-            None => Keys::generate(),
+            None => {
+                let mac_address = get_mac_address().unwrap().unwrap().to_string();
+                let mut seed = [0u8; 32];
+                for (i, byte) in mac_address.bytes().enumerate() {
+                    seed[i % 32] ^= byte;
+                }
+
+                let mut rng = StdRng::from_seed(seed);
+                Keys::generate_with_rng(&mut rng)
+            }
         };
+
         println!("PRIVATE KEY:{:?}", keys.secret_key().to_bech32());
         println!("PUBLIC KEY: {:?}", keys.public_key().to_bech32());
         let connection: Connection = Connection::new();
@@ -111,7 +123,8 @@ impl Session {
         let filter = Filter::new()
             .kind(Kind::EncryptedDirectMessage)
             .author(pubkey)
-            .pubkey(self.keys.public_key());
+            .pubkey(self.keys.public_key())
+            .since(Timestamp::now());
 
         let stream = self.subscribe(filter).await?;
         let decrypted_stream = stream.map(move |event| {

