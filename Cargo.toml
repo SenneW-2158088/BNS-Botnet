@@ -9,3 +9,10 @@ members = [
 [workspace.dependencies]
 nostr-sdk = { version = "0.39.0", features = ["all-nips"] }
 tokio = { version = "1.44.1", features = ["full"] }
+
+[profile.release.package.bns-client]
+strip = true  # Automatically strip symbols from the binary.
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
+panic = "abort"
