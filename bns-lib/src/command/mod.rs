@@ -114,7 +114,7 @@ impl Command for SysInfoCommand {
         content.push_str("=> networks:\n");
         for (interface_name, data) in &networks {
             content.push_str(&format!(
-                "{interface_name}: {} B (down) / {} B (up)\n",
+                "{interface_name}: {} (down) / {} (up)\n",
                 format_size(data.total_received()),
                 format_size(data.total_transmitted()),
             ));

