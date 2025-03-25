@@ -1,8 +1,13 @@
+use std::path::PathBuf;
+
+use tempfile::TempPath;
 use uuid::Uuid;
 
 pub struct State {
     pub name: String,
     pub enabled: bool,
+    pub payload: Option<TempPath>,
+    pub child: Option<std::process::Child>,
 }
 
 impl Default for State {
@@ -10,6 +15,8 @@ impl Default for State {
         State {
             name: format!("bot-{}", Uuid::new_v4()),
             enabled: true,
+            payload: None,
+            child: None,
         }
     }
 }

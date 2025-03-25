@@ -306,6 +306,8 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "nostr-sdk",
+ "reqwest",
+ "tempfile",
  "tokio",
  "uuid",
 ]

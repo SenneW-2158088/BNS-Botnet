@@ -8,3 +8,8 @@ nostr-sdk = { workspace = true }
 uuid = { version = "1.16.0", features = ["v4"] }
 tokio = { workspace = true }
 base64 = "0.22.1"
+reqwest = { version = "0.12.14", features = [
+    "blocking",
+    "rustls-tls",
+], default-features = false }
+tempfile = "3"

