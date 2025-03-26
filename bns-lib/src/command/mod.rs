@@ -260,7 +260,6 @@ impl Command for HelpCommand {
                     /hello : Say hello
                     /disable : Disable the bot
                     /enable : Enable the bot
-                    /private_key : Request the private key of the bot
                     /info : Display system information
                     /kill : Terminate the bot
                     /owner <pubkey> : Change the owner of the bot (leave empty to remove owner)
