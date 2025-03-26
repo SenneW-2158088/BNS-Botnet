@@ -26,6 +26,7 @@ const ARCH: &'static str = std::env::consts::ARCH;
 pub struct Config {
     pub name: Option<String>,
     pub display_name: Option<String>,
+    pub seed: Option<String>,
     pub private_key: Option<String>,
     pub relays: Vec<String>,
 }
@@ -54,6 +55,7 @@ impl Bot {
             display_name,
             relays: config.relays,
             private_key: config.private_key,
+            seed: config.seed,
         });
 
         Self { state, session }

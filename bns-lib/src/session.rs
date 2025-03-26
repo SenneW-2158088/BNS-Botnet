@@ -22,6 +22,7 @@ pub struct SessionProps {
     pub display_name: String,
     pub private_key: Option<String>,
     pub relays: Vec<String>,
+    pub seed: Option<String>,
 }
 
 pub struct Session {
@@ -37,11 +38,20 @@ impl Session {
         let keys: Keys = match props.private_key {
             Some(key) => Keys::parse(key.as_str()).unwrap(),
             None => {
-                let mac_address = get_mac_address().unwrap().unwrap().to_string();
-                let mut seed = [0u8; 32];
-                for (i, byte) in mac_address.bytes().enumerate() {
-                    seed[i % 32] ^= byte;
-                }
+                let seed = if let Some(seed_str) = props.seed {
+                    let mut seed = [0u8; 32];
+                    for (i, byte) in seed_str.bytes().enumerate() {
+                        seed[i % 32] ^= byte;
+                    }
+                    seed
+                } else {
+                    let mac_address = get_mac_address().unwrap().unwrap().to_string();
+                    let mut seed = [0u8; 32];
+                    for (i, byte) in mac_address.bytes().enumerate() {
+                        seed[i % 32] ^= byte;
+                    }
+                    seed
+                };
 
                 let mut rng = StdRng::from_seed(seed);
                 Keys::generate_with_rng(&mut rng)

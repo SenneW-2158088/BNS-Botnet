@@ -11,12 +11,13 @@ use nostr_sdk::prelude::*;
 
 const RELAYS: [&str; 1] = [bns_lib::RELAY];
 
-pub async fn run() -> Result<()> {
+pub async fn run(seed: Option<String>) -> Result<()> {
     let mut bot = Bot::create(Config {
         name: None,
         display_name: None,
         private_key: None,
         relays: RELAYS.to_vec().iter().map(|&s| s.to_string()).collect(),
+        seed,
     });
 
     bot.run().await
@@ -24,7 +25,14 @@ pub async fn run() -> Result<()> {
 
 #[tokio::main]
 async fn main() {
-    match run().await {
+    let args: Vec<String> = std::env::args().collect();
+    let seed = if args.len() > 1 {
+        Some(args[1].clone())
+    } else {
+        None
+    };
+
+    match run(seed).await {
         Err(e) => {
             println!("Got an error {}", e.to_string())
         }
