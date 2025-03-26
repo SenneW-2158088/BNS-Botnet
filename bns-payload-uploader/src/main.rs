@@ -179,11 +179,11 @@ async fn run() -> Result<()> {
 
     let metadata = match fetched {
         Ok(metadata) => metadata.custom_field("payload", encrypted),
-        _ => Metadata::new().custom_field("payload", encrypted),
+        Err(_) => Metadata::new().custom_field("payload", encrypted),
     };
 
     println!("[+] uploading data...");
-    let _ = client.set_metadata(&metadata);
+    let _ = client.set_metadata(&metadata).await;
     let builder = EventBuilder::text_note("Hey check out my new payload :)");
     client.send_event_builder(builder).await.unwrap();
 
